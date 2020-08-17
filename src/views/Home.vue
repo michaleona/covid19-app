@@ -9,10 +9,12 @@
           <div class="covid-banner"></div>
           <img class="covid-banner-illustration" src="@/assets/Cough-Illustration.svg" />
           <div class="covid-banner-content">
-            <span class="covid-banner-title">Kasus Aktif di Indonesia</span>
-            <span class="covid-banner-time">19 Agustus 2020 12:48 WIB</span>
-            <span class="covid-banner-case">128,776</span>
-            <span class="covid-banner-addition"><i class="el-icon-top"></i> +2,776 kasus</span>
+            <span class="covid-banner-title">Kasus Terkonfirmasi</span>
+            <span class="covid-banner-time">{{ lastTimeUpdated }}</span>
+            <span class="covid-banner-case">{{ confirmedCases | thousandSeparator }}</span>
+            <span class="covid-banner-addition">
+              <i class="el-icon-top"></i> +{{ updatedConfirmed | thousandSeparator }} kasus
+            </span>
           </div>
         </el-col>
       </el-row>
@@ -22,13 +24,18 @@
             <div class="covid-card-container">
               <div class="covid-card-cases">
                 <span class="title">Sembuh</span>
-                <span class="total">87,558</span>
-                <span class="addition"><i class="el-icon-top success"></i> +2,500 kasus</span>
+                <span class="total">{{ recoveredCases | thousandSeparator }}</span>
+                <span class="addition">
+                  <i class="el-icon-top success"></i>
+                  +{{ updatedRecovered | thousandSeparator }} kasus
+                </span>
               </div>
               <div class="covid-card-cases">
                 <span class="title">Meninggal</span>
-                <span class="total">5,968</span>
-                <span class="addition"><i class="el-icon-top danger"></i> +2,500 kasus</span>
+                <span class="total">{{ deathCases | thousandSeparator }}</span>
+                <span class="addition">
+                  <i class="el-icon-top danger"></i> +{{ updatedDeath | thousandSeparator }} kasus
+                </span>
               </div>
             </div>
           </div>
@@ -43,26 +50,112 @@
             <img class="covid-card-illustration" src="@/assets/Person-Mask.svg" />
           </div>
         </el-col>
+        <el-col>
+          <h4 class="section-title">Kasus Berdasarkan Provinsi</h4>
+          <div class="covid-card updated-cases">
+            <div class="cases-list" v-for="data in dataByProvince" :key="data.fid">
+              <h5>{{ data.provinsi }}</h5>
+              <div class="cases-number">
+                <div>
+                  <span class="number warning">{{ data.kasusPosi | thousandSeparator }}</span>
+                  <span class="title">Positif</span>
+                </div>
+                <div>
+                  <span  class="number success">{{ data.kasusSemb | thousandSeparator }}</span>
+                  <span class="title">Sembuh</span>
+                </div>
+                <div>
+                  <span class="number danger">{{ data.kasusMeni | thousandSeparator }}</span>
+                  <span class="title">Meninggal</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </el-col>
       </el-row>
     </el-col>
   </el-row>
 </template>
 
 <script>
+import axios from 'axios';
+
 export default {
   data() {
-    return {};
+    return {
+      dataByProvince: [],
+      confirmedCases: 0,
+      recoveredCases: 0,
+      deathCases: 0,
+      lastTimeUpdated: null,
+      updatedConfirmed: 0,
+      updatedRecovered: 0,
+      updatedDeath: 0,
+    };
+  },
+  filters: {
+    thousandSeparator(data) {
+      return data.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    },
+  },
+  methods: {
+    timeConverter(unixTimestamp) {
+      const options = {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      };
+
+      const t = new Date(unixTimestamp).toLocaleDateString('id-ID', options);
+      const s = `${new Date(unixTimestamp).getHours()}:${new Date(unixTimestamp).getMinutes()}`;
+      return `${t} ${s}`;
+    },
+    getCases() {
+      axios
+        .get('https://covid19.mathdro.id/api/countries/indonesia/confirmed')
+        .then((response) => {
+          this.confirmedCases = response.data[0].confirmed;
+          this.recoveredCases = response.data[0].recovered;
+          this.deathCases = response.data[0].deaths;
+          this.lastTimeUpdated = this.timeConverter(response.data[0].lastUpdate);
+        });
+    },
+    getUpdatedCases() {
+      axios
+        .get('https://cors-anywhere.herokuapp.com/https://data.covid19.go.id/public/api/update.json')
+        .then((response) => {
+          this.updatedConfirmed = response.data.update.penambahan.jumlah_positif;
+          this.updatedRecovered = response.data.update.penambahan.jumlah_sembuh;
+          this.updatedDeath = response.data.update.penambahan.jumlah_meninggal;
+        });
+    },
+    getCasesByProvince() {
+      axios
+        .get('https://indonesia-covid-19.mathdro.id/api/provinsi/')
+        .then((response) => {
+          this.dataByProvince = response.data.data;
+        });
+    },
+  },
+  mounted() {
+    this.getCases();
+    this.getUpdatedCases();
+    this.getCasesByProvince();
   },
 };
 </script>
 
 <style lang="scss" scoped>
 .success {
-  color: #35A556;
+  color: #35a556;
 }
 
 .danger {
-  color: #FA514F;
+  color: #fa514f;
+}
+
+.warning {
+  color: #f39c12;
 }
 
 .covid-container {
@@ -161,6 +254,10 @@ export default {
     display: flex;
     flex-direction: column;
     justify-content: center;
+    &.updated-cases {
+      height: 100%;
+      padding-bottom: 32px;
+    }
     &-container {
       display: flex;
       flex-direction: row;
@@ -218,5 +315,38 @@ export default {
     right: 4px;
     height: 150px;
   }
+
+  .cases-list {
+    h5 {
+      font-weight: 600;
+      font-size: 14px;
+      line-height: 16px;
+      margin-bottom: 8px;
+
+      border-bottom: 0.5px solid #ecf0f1;
+      padding-bottom: 8px;
+    }
+    .cases-number {
+      display: flex;
+      flex-direction: row;
+      justify-content: space-between;
+      div {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        .number {
+          font-size: 16px;
+          font-weight: bold;
+        }
+        .title {
+          font-size: 12px;
+        }
+      }
+    }
+  }
+  .section-title {
+      margin: 0px;
+      margin-bottom: 16px;
+    }
 }
 </style>
