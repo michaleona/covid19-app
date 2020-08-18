@@ -6,12 +6,10 @@ module.exports = {
     appleMobileWebAppCapable: 'yes',
     appleMobileWebAppStatusBarStyle: 'black',
 
-    // configure the workbox plugin
-    // workboxPluginMode: 'InjectManifest',
-    // workboxOptions: {
-    //   // swSrc is required in InjectManifest mode.
-    //   swSrc: 'dist/service-worker.js',
-    //   // ...other Workbox options...
-    // }
+    workboxPluginMode: 'InjectManifest',
+    workboxOptions: {
+      swSrc: './src/sw.js',
+      swDest: 'service-worker.js',
+    },
   },
 };

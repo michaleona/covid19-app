@@ -1,6 +1,33 @@
 <template>
   <el-row>
     <el-col :xs="{span: 24}" :md="{span: 6, offset: 9}" class="covid-container">
+      <el-row v-show="!onLine" class="offline-notification">
+        <el-col>
+          <v-offline
+            online-class="notification-online"
+            offline-class="notification-offline"
+            @detected-condition="amIOnline">
+            <template v-slot:[onlineSlot] :slot-name="onlineSlot">
+              <div>
+                {{ onLine ? "Anda terhubung kembali" : "Tidak ada koneksi internet" }}
+              </div>
+            </template>
+            <template v-slot:[offlineSlot] :slot-name="offlineSlot">
+              <div>
+                {{ onLine ? "Anda terhubung kembali" : "Tidak ada koneksi internet" }}
+              </div>
+            </template>
+          </v-offline>
+        </el-col>
+      </el-row>
+      <el-row v-if="updateExists" class="update-notification">
+        <el-col>
+          <div class="notification-info">
+            <span>Versi baru tersedia!</span>
+            <el-button @click="refreshApp" size="mini" type="success" round>Refresh</el-button>
+          </div>
+        </el-col>
+      </el-row>
       <el-row>
         <el-col class="covid-banner-container">
           <div class="covid-header">
@@ -9,7 +36,7 @@
           <div class="covid-banner"></div>
           <img class="covid-banner-illustration" src="@/assets/Cough-Illustration.svg" />
           <div class="covid-banner-content">
-            <span class="covid-banner-title">Kasus Terkonfirmasi</span>
+            <span class="covid-banner-title">Kasus Terkonfirmasi Indonesia</span>
             <span class="covid-banner-time">{{ lastTimeUpdated }}</span>
             <span class="covid-banner-case">{{ confirmedCases | thousandSeparator }}</span>
             <span class="covid-banner-addition">
@@ -79,10 +106,17 @@
 
 <script>
 import axios from 'axios';
+import VOffline from 'v-offline';
 
 export default {
   data() {
     return {
+      onLine: true,
+      onlineSlot: 'online',
+      offlineSlot: 'offline',
+      refreshing: false,
+      registration: null,
+      updateExists: false,
       dataByProvince: [],
       confirmedCases: 0,
       recoveredCases: 0,
@@ -92,6 +126,18 @@ export default {
       updatedRecovered: 0,
       updatedDeath: 0,
     };
+  },
+  components: {
+    VOffline,
+  },
+  watch: {
+    onLine(newValue, oldValue) {
+      if (newValue === true && oldValue === false) {
+        this.getCases();
+        this.getUpdatedCases();
+        this.getCasesByProvince();
+      }
+    },
   },
   filters: {
     thousandSeparator(data) {
@@ -136,6 +182,30 @@ export default {
           this.dataByProvince = response.data.data;
         });
     },
+    showRefreshUI(e) {
+      this.registration = e.detail;
+      this.updateExists = true;
+    },
+    refreshApp() {
+      this.updateExists = false;
+      if (!this.registration || !this.registration.waiting) { return; }
+      this.registration.waiting.postMessage('skipWaiting');
+    },
+    amIOnline(e) {
+      this.onLine = e;
+    },
+  },
+  created() {
+    document.addEventListener(
+      'swUpdated', this.showRefreshUI, { once: true },
+    );
+    navigator.serviceWorker.addEventListener(
+      'controllerchange', () => {
+        if (this.refreshing) return;
+        this.refreshing = true;
+        window.location.reload();
+      },
+    );
   },
   mounted() {
     this.getCases();
@@ -345,8 +415,56 @@ export default {
     }
   }
   .section-title {
-      margin: 0px;
-      margin-bottom: 16px;
+    margin: 0px;
+    margin-bottom: 16px;
+  }
+  .update-notification {
+    position: fixed;
+    bottom: 16px;
+    left: 16px;
+    right: 16px;
+    z-index: 1;
+  }
+  .notification-info {
+    background: #2f3640;
+    height: 48px;
+    border-radius: 10px;
+    padding: 0px 32px;
+    -webkit-box-shadow: 0px 10px 20px 0px rgba(183, 183, 255, 0.16);
+    -moz-box-shadow: 0px 10px 20px 0px rgba(183, 183, 255, 0.16);
+    box-shadow: 0px 10px 20px 0px rgba(183, 183, 255, 0.16);
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    span {
+      color: #f5f6fa;
+      font-size: 12px;
+      font-weight: bold;
     }
+  }
+  .offline-notification {
+    position: fixed;
+    bottom: 0px;
+    left: 0px;
+    right: 0px;
+    z-index: 1;
+    .notification-online {
+      background-color: #35a556;
+      color: #ffffff;
+      font-size: 12px;
+      font-weight: bold;
+      text-align: center;
+      padding: 8px;
+    }
+    .notification-offline {
+      background-color: #fa514f;
+      color: #ffffff;
+      font-size: 12px;
+      font-weight: bold;
+      text-align: center;
+      padding: 8px;
+    }
+  }
 }
 </style>
